@@ -1,3 +1,4 @@
 ws-chat*
-./proto*
-./logs*
+proto*
+logs*
+config.json

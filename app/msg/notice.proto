@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package notice;
+
+option go_package = "../msg/notice;notice";
+
+message Notice{
+	int64 Id = 1;
+	int32 Type = 2;
+	string Title = 3;
+	string Content = 4;
+	string OkUrl = 5;
+	repeated string Image = 6;
+}

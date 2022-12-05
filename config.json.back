@@ -1,0 +1,14 @@
+{
+	"port": "ws server listen port",
+	"authUrl": "server auth url",
+	"offlineUrl": "user offline notice url",
+	"dbPath": "Message save sqlite db path",
+	"oss": {
+		"endpoint": "oss endpoint",
+		"url": "oss url",
+		"accesskeyid": "oss access key id",
+		"secret": "oss secret string",
+		"bucket": "oss bucket",
+		"ssl": false
+	}
+}
