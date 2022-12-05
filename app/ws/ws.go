@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"ws-chat/app/funcs"
 	"ws-chat/app/logs"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 )
@@ -41,18 +43,36 @@ func Start() {
 		panic("请配置 AuthUrl")
 	}
 
-	http.HandleFunc("/conn", Connect)
+	r := gin.Default()
+	r.GET("/conn", Connect)
+	r.GET("/chatlist", func(c *gin.Context) {
+		uid, _ := strconv.Atoi(c.Query("id"))
+		user := GetUser(int64(uid))
+		if user == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"code": 404,
+				"msg":  "not found",
+				"data": nil,
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"code": 200,
+			"msg":  "",
+			"data": user.GetRooms(),
+		})
+	})
 
 	port := fmt.Sprintf(":%d", configs.Conf.Port)
 	fmt.Println("监听端口:", port)
-	err := http.ListenAndServe(port, nil)
+	err := r.Run(port)
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-func Connect(w http.ResponseWriter, r *http.Request) {
-	u, e := checkToken(w, r)
+func Connect(c *gin.Context) {
+	u, e := checkToken(c.Writer, c.Request)
 	if e != nil {
 		return
 	}
@@ -62,7 +82,7 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 		WsConn *websocket.Conn
 		conn   *Connections
 	)
-	if WsConn, err = upgrader.Upgrade(w, r, nil); err != nil {
+	if WsConn, err = upgrader.Upgrade(c.Writer, c.Request, nil); err != nil {
 		logs.Logger.Error(err)
 		return
 	}

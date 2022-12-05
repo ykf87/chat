@@ -1,7 +1,6 @@
 package main
 
 import (
-	"ws-chat/app/db"
 	// "time"
 	// "wx-chat/app/oss"
 	"ws-chat/app/ws"
@@ -12,8 +11,8 @@ func main() {
 	// str, _ := o.Upload("E:/360Downloads/support.png", "2222222222.png")
 	// time.Sleep(time.Second * 30)
 	// o.Remove(str)
-
-	db.Create("erwe.db")
-
+	u := new(ws.User)
+	u.Id = 1
+	u.GetRooms()
 	ws.Start()
 }

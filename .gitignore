@@ -2,3 +2,4 @@ ws-chat*
 proto*
 logs*
 config.json
+db/*
