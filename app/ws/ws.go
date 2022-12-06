@@ -79,7 +79,7 @@ func Start() {
 
 	go func() {
 		for {
-			time.Sleep(time.Second * 10)
+			time.Sleep(time.Second * 40)
 			now := time.Now().Unix()
 			Users.Range(func(key, val interface{}) bool {
 				if val == nil {
@@ -87,6 +87,7 @@ func Start() {
 				}
 				u := val.(*User)
 				if u.PingTime+60 < now {
+					logs.Logger.Infoln(u.Id, ": 连接超时!")
 					u.Remove()
 				}
 				return true
@@ -243,7 +244,7 @@ func (this *User) Listen() {
 	for {
 		msg, err := this.Conn.ReadMessage()
 		if err != nil {
-			logs.Logger.Error(err)
+			// logs.Logger.Error(err)
 			break
 		}
 		this.PingTime = time.Now().Unix()
