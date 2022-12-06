@@ -2,7 +2,7 @@ package oss
 
 import (
 	"errors"
-	"wx-chat/app/oss/minio"
+	"ws-chat/app/oss/minio"
 )
 
 type Oss interface {

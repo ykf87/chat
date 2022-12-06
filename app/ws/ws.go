@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"ws-chat/app/configs"
 	"ws-chat/app/funcs"
 	"ws-chat/app/logs"
+	"ws-chat/app/oss"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -23,8 +25,8 @@ type User struct {
 	Name     string       `json:"name"`      //用户昵称
 	Avatar   string       `json:"avatar"`    //头像地址
 	Conn     *Connections `json:"-"`         //用户ws
-	OutConn  chan byte    `json:"-"`         //退出协程
 	ConnTime int64        `json:"conn_time"` //连接时间
+	PingTime int64        `json:"ping_time"`
 }
 
 var Users sync.Map
@@ -32,6 +34,15 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin:     checkOrigin,
+}
+var OssClient oss.Oss
+
+func init() {
+	var err error
+	OssClient, err = oss.GetOss("minio")
+	if err != nil {
+		panic(err)
+	}
 }
 
 func checkOrigin(r *http.Request) bool {
@@ -45,7 +56,7 @@ func Start() {
 
 	r := gin.Default()
 	r.GET("/conn", Connect)
-	r.GET("/chatlist", func(c *gin.Context) {
+	r.GET("/api/chatlist", func(c *gin.Context) {
 		uid, _ := strconv.Atoi(c.Query("id"))
 		user := GetUser(int64(uid))
 		if user == nil {
@@ -65,6 +76,24 @@ func Start() {
 
 	port := fmt.Sprintf(":%d", configs.Conf.Port)
 	fmt.Println("监听端口:", port)
+
+	go func() {
+		for {
+			time.Sleep(time.Second * 10)
+			now := time.Now().Unix()
+			Users.Range(func(key, val interface{}) bool {
+				if val == nil {
+					return false
+				}
+				u := val.(*User)
+				if u.PingTime+60 < now {
+					u.Remove()
+				}
+				return true
+			})
+		}
+	}()
+
 	err := r.Run(port)
 	if err != nil {
 		fmt.Println(err)
@@ -91,10 +120,11 @@ func Connect(c *gin.Context) {
 		logs.Logger.Error(err)
 		return
 	}
+
 	logs.Logger.Debug(fmt.Sprintf("%d: 登录", u.Id))
 	u.Conn = conn
 	u.ConnTime = time.Now().Unix()
-	u.OutConn = make(chan byte)
+	u.PingTime = time.Now().Unix()
 	defer u.Remove()
 	u.Listen()
 }
@@ -186,6 +216,10 @@ func getPlatform(r *http.Request, df string) string {
 }
 
 func SetUser(id int64, name, avatar string) *User {
+	ou := GetUser(id)
+	if ou != nil {
+		ou.Remove()
+	}
 	u := new(User)
 	u.Id = id
 	u.Name = name
@@ -202,25 +236,18 @@ func GetUser(id int64) *User {
 	return u.(*User)
 }
 
+var pingbyte = []byte("ping")
+
 func (this *User) Listen() {
 	Users.Store(this.Id, this)
-	go func() {
-		for {
-			time.Sleep(time.Second * 30)
-			if time.Now().Unix()-30 > this.ConnTime {
-				this.Conn.Close()
-				break
-			}
-		}
-	}()
 	for {
 		msg, err := this.Conn.ReadMessage()
 		if err != nil {
 			logs.Logger.Error(err)
 			break
 		}
-		msgstr := string(msg)
-		if msgstr == "ping" {
+		this.PingTime = time.Now().Unix()
+		if bytes.Equal(msg, pingbyte) {
 			this.Conn.WriteMessage([]byte("pong"))
 		} else {
 			this.GetChat(msg)

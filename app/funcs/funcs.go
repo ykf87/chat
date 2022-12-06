@@ -2,7 +2,6 @@ package funcs
 
 import (
 	"bytes"
-	// "crypto/md5"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -14,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 	// "github.com/tidwall/gjson"
 )
@@ -131,4 +132,73 @@ func Request(method, uri string, data []byte, header map[string]string, proxy st
 		return respbody, errors.New(fmt.Sprintf("请求发生错误:\r\n\turi: %s.\r\n\thttpcode: %d.\r\n\tmessage: %s", uri, resp.StatusCode, string(respbody)))
 	}
 	return respbody, nil
+}
+
+//文件base64
+//返回 base64格式的正文内容 和 文件content-type
+func ParseBase64(content string) (string, string) {
+	b, err := regexp.MatchString(`^data:(.+?);base64,`, content)
+	if !b {
+		fmt.Println(err)
+		return "", ""
+	}
+
+	re, _ := regexp.Compile(`^data:(.+?);base64,(.+)`)
+	allData := re.FindStringSubmatch(content)
+	if len(allData) == 3 {
+		return allData[2], allData[1]
+	}
+
+	return "", ""
+}
+
+func GetBase64Type(tp string) string {
+	tp = strings.ToLower(tp)
+	switch tp {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/pjpeg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/x-png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/bmp":
+		return ".bmp"
+	case "image/x-icon":
+		return ".ico"
+	case "application/zip":
+		return ".zip"
+	case "video/avi":
+		return ".avi"
+	case "application/vnd.rn-realmedia-vbr":
+		return ".rmvb"
+	case "audio/mpeg":
+		return ".mp3"
+	case "audio/wav":
+		return ".wav"
+	case "text/plain":
+		return ".txt"
+	case "application/msword":
+		return ".doc"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		return ".docx"
+	case "application/vnd.ms-excel":
+		return ".xls"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return ".xlsx"
+	case "application/vnd.ms-powerpoint":
+		return ".ppt"
+	case "application/pdf":
+		return ".pdf"
+	case "video/mp4":
+		return ".mp4"
+	case "font/ttf":
+		return ".ttf"
+	case "text/csv":
+		return ".csv"
+	}
+	return tp
 }
