@@ -142,7 +142,7 @@ func (this *User) ReadMsg(roomid int64) {
 }
 
 func (this *User) GetChat(msg []byte) {
-	fmt.Println("from: ", msg)
+	// fmt.Println("from: ", msg)
 	// this.Conn.WriteMessage([]byte("123"))
 	// return
 	msgobj := &chat.Chat{}
@@ -264,24 +264,35 @@ func (this *User) SingleChat(msg *chat.Chat, content string) (roomid int64) {
 		return
 	}
 	result := new(RoomUser)
-	rs := DB.Model(&RoomUser{}).Where("uid = ?", this.Id).Where("`to` = ?", to).Scan(result)
-	if rs.Error != nil {
-		roomObj := new(Room)
-		roomObj.Addtime = time.Now().Unix()
-		roomObj.Created = this.Id
-		rs := DB.Create(roomObj)
-		if rs.Error != nil {
-			return
+	DB.Model(&RoomUser{}).Where("uid = ?", this.Id).Where("`to` = ?", to).Scan(result)
+	var room *Room
+	if result.Uid == 0 {
+		resultt := new(RoomUser)
+		DB.Model(&RoomUser{}).Where("uid = ?", to).Where("`to` = ?", this.Id).Scan(resultt)
+
+		if resultt.Uid == 0 {
+			room = new(Room)
+			room.Addtime = time.Now().Unix()
+			room.Created = this.Id
+			room.LastTime = time.Now().Unix()
+			rs := DB.Create(room)
+			if rs.Error != nil {
+				return
+			}
+			roomid = room.Id
+		} else {
+			roomid = resultt.RoomId
 		}
+
 		ru := new(RoomUser)
 		ru.Uid = to
-		ru.RoomId = roomObj.Id
+		ru.RoomId = roomid
 		ru.Addtime = time.Now().Unix()
 		ru.To = this.Id
 
 		ru2 := new(RoomUser)
 		ru2.Uid = this.Id
-		ru2.RoomId = roomObj.Id
+		ru2.RoomId = roomid
 		ru2.Addtime = time.Now().Unix()
 		ru2.To = to
 
@@ -290,9 +301,13 @@ func (this *User) SingleChat(msg *chat.Chat, content string) (roomid int64) {
 		ccccc = append(ccccc, ru)
 
 		DB.Create(ccccc)
-		roomid = roomObj.Id
 	} else {
 		roomid = result.RoomId
+		result.ReadTime = time.Now().Unix()
+		DB.Model(result).UpdateColumn("read_time", time.Now().Unix())
+	}
+	if room == nil {
+		DB.Model(room).Where("id=?", roomid).UpdateColumn("last_time", time.Now().Unix())
 	}
 
 	if user := GetUser(to); user != nil {
@@ -322,9 +337,6 @@ func (this *User) Response(msg *chat.Chat, content string) error {
 	chatobj.Room = msg.GetRoom()
 
 	bt, err := proto.Marshal(chatobj)
-	fmt.Println("tooo: ", bt)
-	fmt.Println(msg.String())
-	fmt.Println(chatobj.String())
 	if err != nil {
 		return err
 	}

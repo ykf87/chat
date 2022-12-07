@@ -128,6 +128,14 @@ func Connect(c *gin.Context) {
 	u.ConnTime = time.Now().Unix()
 	u.PingTime = time.Now().Unix()
 	u.Ipaddr = c.ClientIP()
+
+	uuuuu := new(User)
+	DB.Model(uuuuu).Where("id=?", u.Id).First(uuuuu)
+	if uuuuu.Id > 0 {
+		DB.Model(u).Updates(u)
+	} else {
+		DB.Model(u).Create(u)
+	}
 	defer u.Remove()
 	u.Listen()
 }
