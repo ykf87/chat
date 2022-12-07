@@ -20,14 +20,14 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-type User struct {
-	Id       int64        `json:"id"`        //用户id
-	Name     string       `json:"name"`      //用户昵称
-	Avatar   string       `json:"avatar"`    //头像地址
-	Conn     *Connections `json:"-"`         //用户ws
-	ConnTime int64        `json:"conn_time"` //连接时间
-	PingTime int64        `json:"ping_time"`
-}
+// type User struct {
+// 	Id       int64        `json:"id"`        //用户id
+// 	Name     string       `json:"name"`      //用户昵称
+// 	Avatar   string       `json:"avatar"`    //头像地址
+// 	Conn     *Connections `json:"-"`         //用户ws
+// 	ConnTime int64        `json:"conn_time"` //连接时间
+// 	PingTime int64        `json:"ping_time"`
+// }
 
 var Users sync.Map
 var upgrader = websocket.Upgrader{
@@ -73,6 +73,7 @@ func Start() {
 			"data": user.GetRooms(),
 		})
 	})
+	r.GET("/api/readmsg")
 
 	port := fmt.Sprintf(":%d", configs.Conf.Port)
 	fmt.Println("监听端口:", port)
@@ -126,6 +127,7 @@ func Connect(c *gin.Context) {
 	u.Conn = conn
 	u.ConnTime = time.Now().Unix()
 	u.PingTime = time.Now().Unix()
+	u.Ipaddr = c.ClientIP()
 	defer u.Remove()
 	u.Listen()
 }

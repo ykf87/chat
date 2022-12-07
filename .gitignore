@@ -3,3 +3,4 @@ proto*
 logs*
 config.json
 db/*
+tem/*
