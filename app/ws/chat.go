@@ -10,9 +10,10 @@ import (
 	"ws-chat/app/logs"
 	"ws-chat/app/msg/chat"
 
-	"gorm.io/gorm"
+	"github.com/gorilla/websocket"
 
 	"github.com/golang/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 type ChatList struct { //用户聊天列表
@@ -54,7 +55,7 @@ type RoomUser struct {
 }
 type Messages struct { //消息列表
 	Id      int64  `gorm:"primaryKey;autoIncrement" json:"id"` //消息id
-	RoomId  int64  `gorm:"not null;index"`                     //房间id
+	RoomId  int64  `gorm:"not null;index" json:"room_id"`      //房间id
 	From    int64  `json:"from" gorm:"index"`                  //发消息的用户
 	Addtime int64  `json:"addtime" gorm:"not null"`            //添加时间
 	Content string `json:"content"`                            //消息内容
@@ -137,8 +138,20 @@ func (this *User) GetRooms() interface{} {
 }
 
 //读取聊天消息
-func (this *User) ReadMsg(roomid int64) {
-
+func (this *User) ReadMsg(uid int64) (msgs []*Messages) {
+	roomuser := new(RoomUser)
+	DB.Model(&RoomUser{}).Where("uid=?", this.Id).Where("`to`=?", uid).Scan(roomuser)
+	if roomuser.Uid < 1 {
+		return nil
+	}
+	DB.Model(&Messages{}).Where("room_id = ?", roomuser.RoomId).Where("addtime>?", roomuser.ReadTime).Scan(&msgs)
+	go DB.Model(&RoomUser{}).Where("uid=?", roomuser.Uid).Where("`to`=?", roomuser.To).Where("room_id=?", roomuser.RoomId).UpdateColumn("read_time", time.Now().Unix())
+	for _, v := range msgs {
+		if this.IsUploaded(v.Type) == true {
+			v.Content = OssClient.Url(v.Content)
+		}
+	}
+	return
 }
 
 func (this *User) GetChat(msg []byte) {
@@ -260,7 +273,7 @@ func (this *User) FmtChat(msgobj *chat.Chat) (content string) {
 //私聊
 func (this *User) SingleChat(msg *chat.Chat, content string) (roomid int64) {
 	to := msg.GetTo()
-	if to < 1 {
+	if to < 1 || this.Id == to {
 		return
 	}
 	result := new(RoomUser)
@@ -340,5 +353,7 @@ func (this *User) Response(msg *chat.Chat, content string) error {
 	if err != nil {
 		return err
 	}
+	// return this.Conn.Conn.WriteMessage(websocket.BinaryMessage, bt)
+	this.Conn.MsgType = websocket.BinaryMessage
 	return this.Conn.WriteMessage(bt)
 }

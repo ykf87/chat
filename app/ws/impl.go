@@ -13,6 +13,7 @@ type Connections struct {
 	OutChan   chan []byte
 	CloseChan chan byte
 	Mutex     sync.Mutex
+	MsgType   int
 	IsClose   bool
 }
 
@@ -96,8 +97,7 @@ func (conn *Connections) writer() {
 			goto ERR
 		case data = <-conn.OutChan:
 		}
-
-		if conn.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		if conn.Conn.WriteMessage(conn.MsgType, data); err != nil {
 			goto ERR
 		}
 	}

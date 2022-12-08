@@ -33,7 +33,9 @@ var Users sync.Map
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin:     checkOrigin,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 var OssClient oss.Oss
 
@@ -43,10 +45,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func checkOrigin(r *http.Request) bool {
-	return true
 }
 
 func Start() {
@@ -73,7 +71,24 @@ func Start() {
 			"data": user.GetRooms(),
 		})
 	})
-	r.GET("/api/readmsg")
+	r.GET("/api/readmsg", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Query("id"))
+		user := GetUser(int64(id))
+		if user == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"code": 404,
+				"msg":  "not found",
+				"data": nil,
+			})
+			return
+		}
+		uid, _ := strconv.Atoi(c.Query("uid"))
+		c.JSON(http.StatusOK, gin.H{
+			"code": 200,
+			"msg":  "",
+			"data": user.ReadMsg(int64(uid)),
+		})
+	})
 
 	port := fmt.Sprintf(":%d", configs.Conf.Port)
 	fmt.Println("监听端口:", port)
@@ -122,6 +137,7 @@ func Connect(c *gin.Context) {
 		logs.Logger.Error(err)
 		return
 	}
+	conn.MsgType = websocket.BinaryMessage
 
 	logs.Logger.Debug(fmt.Sprintf("%d: 登录", u.Id))
 	u.Conn = conn
@@ -259,6 +275,7 @@ func (this *User) Listen() {
 		}
 		this.PingTime = time.Now().Unix()
 		if bytes.Equal(msg, pingbyte) {
+			this.Conn.MsgType = websocket.TextMessage
 			this.Conn.WriteMessage([]byte("pong"))
 		} else {
 			this.GetChat(msg)
